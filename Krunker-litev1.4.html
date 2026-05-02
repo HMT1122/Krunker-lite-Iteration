@@ -12,11 +12,11 @@
     html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:system-ui,sans-serif;touch-action:none;user-select:none;color:var(--txt)}
     canvas{display:block;width:100vw;height:100vh;image-rendering:pixelated}
     .ui{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
-    .scr{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--panel);padding:1.5rem;border-radius:16px;text-align:center;pointer-events:auto;border:3px solid var(--brd);max-width:95vw;box-shadow:0 0 30px rgba(0,0,0,0.4);max-height:90vh;overflow-y:auto}
+    .scr{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--panel);padding:1.5rem;border-radius:16px;text-align:center;pointer-events:auto;border:3px solid var(--brd);max-width:95vw;box-shadow:0 0 30px rgba(0,0,0,0.4);max-height:85vh;overflow-y:auto;z-index:100}
     .scr.h{display:none!important}
     h1,h2{color:var(--acc);margin-bottom:0.5rem}
     .hint{margin:0.8rem 0;padding:0.8rem;background:rgba(128,128,128,0.15);border-radius:10px;font-size:0.85rem;text-align:left;line-height:1.5;border-left:4px solid var(--acc)}
-    .btn{display:inline-block;margin:0.4rem 0.2rem;padding:0.8rem 1.8rem;background:linear-gradient(135deg,var(--acc),color-mix(in srgb,var(--acc) 70%,#000));color:var(--txt);font-weight:600;border:none;border-radius:10px;cursor:pointer;font-size:1rem;transition:transform .1s}
+    .btn{display:inline-block;margin:0.4rem 0.2rem;padding:0.8rem 1.8rem;background:linear-gradient(135deg,var(--acc),color-mix(in srgb,var(--acc) 70%,#000));color:var(--txt);font-weight:600;border:none;border-radius:10px;cursor:pointer;font-size:1rem;transition:transform .1s;z-index:105;position:relative}
     .btn:hover{transform:translateY(-2px)} .btn:active{transform:scale(.97)} .btn.sec{background:#6c757d}
     #hud{position:absolute;top:0;left:0;width:100%;padding:.7rem 1rem;display:flex;justify-content:space-between;pointer-events:none;z-index:50}
     .box{background:var(--panel);padding:.4rem .8rem;border-radius:8px;border:2px solid var(--brd);min-width:100px}
@@ -47,8 +47,13 @@
     .tab{padding:6px 14px;background:rgba(255,255,255,.1);border-radius:20px;cursor:pointer;font-size:.9rem}
     .tab.act{background:var(--acc);color:var(--bg)}
     @media(max-width:768px){
-      h1{font-size:1.5rem} .scr{padding:1rem} .btn{padding:.7rem 1.4rem}
-      #tc{display:flex} #wbar{bottom:130px} .box{min-width:85px}
+      h1{font-size:1.5rem} 
+      .scr{padding:1rem;max-height:70vh} 
+      .btn{padding:.8rem 1.5rem;font-size:0.95rem;margin:0.5rem auto;display:block;width:200px}
+      #tc{display:flex} 
+      #wbar{bottom:130px} 
+      .box{min-width:85px}
+      .hint{font-size:0.75rem}
     }
   </style>
 </head>
@@ -209,8 +214,15 @@ const G={
     for(let i=0;i<40;i++)this.bls.push(new Bl);for(let i=0;i<180;i++)this.pts.push(new Pt);for(let i=0;i<25;i++)this.ens.push(new En);for(let i=0;i<8;i++)this.pus.push(new Pu);
     document.getElementById('hs').textContent=DB.d.h;document.getElementById('ac').textContent=DB.d.unlocked.length;
     this.lbGen();
+    // 設置按鈕事件
+    const sbtn = document.getElementById('sbtn');
+    if (sbtn) {
+      sbtn.addEventListener('click', () => {
+        Audio.init();
+        this.start();
+      }, false);
+    }
     this.loop(0);
-    document.getElementById('sbtn').onclick=()=>{Audio.init();this.start()};
   },
   resize(){this.cv.width=innerWidth;this.cv.height=innerHeight},
   lbGen(){
