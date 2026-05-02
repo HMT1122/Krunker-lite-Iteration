@@ -2,377 +2,402 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <title>Tunnel Dash - 極速隧道</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0" />
+  <title>Krunker-lite v1.5 | 動態地圖・配件・聯網預留</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      background: #0a0a1a;
-      color: #fff;
-      overflow: hidden;
-      touch-action: none;
-      user-select: none;
-    }
-    #game-container {
-      position: fixed; top: 0; left: 0;
-      width: 100vw; height: 100vh;
-      display: flex; justify-content: center; align-items: center;
-    }
-    canvas { display: block; max-width: 100%; max-height: 100%; border-radius: 8px; box-shadow: 0 0 30px rgba(0, 200, 255, 0.2); }
+    :root{--bg:#16213e;--panel:rgba(26,26,46,0.95);--acc:#4ecca3;--txt:#fff;--brd:#4ecca3;--dng:#ff6b6b;--wrn:#f9c74f}
+    body.dark{--bg:#0d0d0d;--panel:rgba(13,13,13,0.96);--acc:#888;--txt:#ccc;--brd:#555}
+    body.day{--bg:#eef2f6;--panel:rgba(255,255,255,0.96);--acc:#2c3e50;--txt:#111;--brd:#2c3e50}
+    *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:system-ui,sans-serif;touch-action:none;user-select:none;color:var(--txt)}
+    canvas{display:block;width:100vw;height:100vh;image-rendering:pixelated}
     
-    #ui-layer {
-      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      pointer-events: none; display: flex; flex-direction: column;
-      justify-content: space-between; padding: 20px;
-    }
-    .score-box { display: flex; flex-direction: column; gap: 4px; }
-    .score-display { font-size: 1.6rem; font-weight: bold; text-shadow: 0 0 10px rgba(0,255,200,0.7); }
-    .high-score { font-size: 1rem; opacity: 0.6; }
-    .hint {
-      font-size: 0.9rem; opacity: 0.8; text-align: center; padding: 8px 16px;
-      background: rgba(0,30,60,0.5); border-radius: 20px; align-self: center; margin-bottom: 12px;
-    }
+    /* UI 狀態控制 */
+    .ui{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10}
+    .scr{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--panel);padding:1.5rem;border-radius:16px;text-align:center;pointer-events:auto;border:3px solid var(--brd);max-width:95vw;box-shadow:0 0 30px rgba(0,0,0,0.4);z-index:100}
+    .scr.h{display:none!important}
+    h1,h2{color:var(--acc);margin-bottom:.5rem}
+    .hint{margin:.8rem 0;padding:.8rem;background:rgba(128,128,128,.15);border-radius:10px;font-size:.85rem;text-align:left;line-height:1.5;border-left:4px solid var(--acc)}
+    .btn{display:inline-block;margin:.4rem .2rem;padding:.8rem 1.8rem;background:linear-gradient(135deg,var(--acc),color-mix(in srgb,var(--acc) 70%,#000));color:var(--txt);font-weight:600;border:none;border-radius:10px;cursor:pointer;font-size:1rem;transition:transform .1s}
+    .btn:hover{transform:translateY(-2px)} .btn:active{transform:scale(.97)} .btn.sec{background:#6c757d}
     
-    .overlay {
-      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(10, 10, 30, 0.92);
-      display: flex; flex-direction: column; justify-content: center; align-items: center;
-      pointer-events: auto; z-index: 10; transition: opacity 0.3s ease;
-    }
-    .overlay.hidden { opacity: 0; pointer-events: none; transform: scale(0.98); }
-    .title { font-size: 2.5rem; font-weight: 800; margin-bottom: 8px; background: linear-gradient(135deg, #00f5ff, #7b00ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-shadow: 0 0 20px rgba(0,245,255,0.4); }
-    .subtitle { font-size: 1.1rem; opacity: 0.85; margin-bottom: 32px; text-align: center; max-width: 80%; line-height: 1.5; }
-    .btn {
-      padding: 14px 44px; font-size: 1.2rem; font-weight: bold; color: #fff;
-      background: linear-gradient(135deg, #00c8ff, #7b00ff); border: none; border-radius: 32px;
-      cursor: pointer; transition: transform 0.1s, box-shadow 0.2s;
-      box-shadow: 0 6px 24px rgba(0,200,255,0.35);
-    }
-    .btn:hover { transform: translateY(-2px); }
-    .btn:active { transform: translateY(1px); }
-    .controls-hint { margin-top: 24px; font-size: 0.9rem; opacity: 0.7; text-align: center; line-height: 1.6; }
-    .controls-hint kbd { display: inline-block; padding: 3px 7px; margin: 0 2px; background: rgba(255,255,255,0.15); border-radius: 4px; font-family: monospace; font-weight: bold; }
+    /* HUD */
+    #hud{position:absolute;top:0;left:0;width:100%;padding:.7rem 1rem;display:flex;justify-content:space-between;pointer-events:none;z-index:50}
+    .box{background:var(--panel);padding:.4rem .8rem;border-radius:8px;border:2px solid var(--brd);min-width:100px}
+    .lbl{font-size:.75rem;opacity:.7} .val{font-size:1.2rem;color:var(--acc);font-weight:bold}
+    #hpBar{width:120px;height:12px;background:rgba(0,0,0,.3);border-radius:6px;overflow:hidden;margin-top:4px;border:1px solid #555}
+    #hpFill{height:100%;width:100%;background:linear-gradient(90deg,var(--acc),#3aa885);transition:width .15s}
+    #hpFill.low{background:linear-gradient(90deg,var(--dng),#e53935)}
     
-    @media (max-width: 768px) {
-      .title { font-size: 2rem; }
-      .subtitle { font-size: 0.95rem; }
-      .hint { font-size: 0.85rem; padding: 6px 12px; }
-      .controls-hint { font-size: 0.85rem; }
+    /* 遊戲中 UI (預設隱藏) */
+    .game-ui{display:none;pointer-events:auto}
+    body.playing .game-ui{display:flex}
+    #wbar{position:absolute;bottom:15px;left:50%;transform:translateX(-50%);gap:8px;z-index:60}
+    .wb{width:46px;height:46px;border-radius:10px;background:var(--panel);border:2px solid var(--brd);color:var(--txt);font-size:1.3rem;cursor:pointer;display:flex;align-items:center;justify-content:center}
+    .wb.act{background:var(--acc);color:var(--bg);border-color:#fff;transform:scale(1.1)}
+    #tc{position:absolute;bottom:10px;width:100%;height:110px;pointer-events:none;z-index:55}
+    .jz{position:absolute;width:100px;height:100px;border-radius:50%;background:rgba(128,128,128,.15);border:2px dashed rgba(128,128,128,.4);pointer-events:auto;display:flex;align-items:center;justify-content:center}
+    #mz{left:20px} #sz{right:20px}
+    .jk{width:40px;height:40px;background:var(--acc);border-radius:50%;border:3px solid #fff}
+    .jz.act .jk{transform:scale(.85)} #sz.act{background:rgba(255,107,107,.25)}
+    
+    .top-btn{position:absolute;top:8px;width:34px;height:34px;border-radius:50%;background:var(--panel);border:2px solid var(--brd);color:var(--txt);cursor:pointer;font-size:1rem;z-index:70;display:flex;align-items:center;justify-content:center;pointer-events:auto}
+    #abtn{right:8px} #tbtn{right:48px} #nbtn{right:88px}
+    .muted{color:var(--dng)!important;border-color:var(--dng)!important}
+    .net-on{background:var(--dng);border-color:#fff}
+    
+    /* 附件提示 */
+    #attachTip{position:absolute;bottom:75px;left:50%;transform:translateX(-50%);background:var(--panel);padding:6px 12px;border-radius:16px;border:1px solid var(--acc);font-size:.8rem;pointer-events:none;z-index:45;transition:opacity .3s}
+    
+    /* 結算面板 */
+    .tabs{display:flex;gap:8px;margin:10px 0;justify-content:center}
+    .tab{padding:6px 14px;background:rgba(255,255,255,.1);border-radius:20px;cursor:pointer;font-size:.9rem}
+    .tab.act{background:var(--acc);color:var(--bg)}
+    .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:.8rem 0;font-size:.9rem}
+    .stat-row{background:rgba(128,128,128,.1);padding:6px 10px;border-radius:6px;display:flex;justify-content:space-between}
+    table{width:100%;border-collapse:collapse;margin:.8rem 0;font-size:.85rem}
+    th,td{padding:8px;border-bottom:1px solid rgba(255,255,255,.1)}
+    tr:nth-child(even){background:rgba(255,255,255,.05)}
+    
+    @media(max-width:768px){
+      h1{font-size:1.5rem} .scr{padding:1rem;width:90%}
+      .btn{padding:.7rem 1.4rem;font-size:.95rem}
+      .box{min-width:85px} .val{font-size:1.1rem}
     }
   </style>
 </head>
 <body>
-  <div id="game-container">
-    <canvas id="gameCanvas"></canvas>
-    <div id="ui-layer">
-      <div class="score-box">
-        <div class="score-display">距離: <span id="score">0</span>m</div>
-        <div class="high-score">最高紀錄: <span id="high-score">0</span>m</div>
-      </div>
-      <div class="hint" id="hint">← → 或 A/D 移動 | 觸控螢幕左右側</div>
+  <canvas id="c"></canvas>
+  <div class="ui">
+    <button id="abtn" class="top-btn" title="音效">🔊</button>
+    <button id="tbtn" class="top-btn" title="主題">🌙</button>
+    <button id="nbtn" class="top-btn" title="模擬聯網">🌐</button>
+
+    <!-- 開始畫面 -->
+    <div id="start" class="scr">
+      <h1>🎯 Krunker-lite</h1>
+      <p style="opacity:.8;margin:.5rem 0;font-size:.85rem">v1.5 迭代6：動態地圖・配件・聯網預留</p>
+      <div class="hint">💻 WASD移動 / 滑鼠射擊 / Q切槍 / F開鏡<br>📱 左搖桿 / 右射擊 / 底欄切槍<br>🌐 開啟兩個分頁可看到彼此幽靈</div>
+      <p style="font-size:.8rem;margin:.5rem 0">🏆 歷史最高: <span id="hs">0</span></p>
+      <button class="btn" id="sbtn">▶️ 開始戰鬥</button>
     </div>
 
-    <div id="start-screen" class="overlay">
-      <h1 class="title">🚀 Tunnel Dash</h1>
-      <p class="subtitle">在高速隧道中躲避障礙，挑戰你的反應極限！</p>
-      <button class="btn" id="start-btn">▶ 開始遊戲</button>
-      <div class="controls-hint">
-        💻 桌面：<kbd>←</kbd> <kbd>→</kbd> 或 <kbd>A</kbd> <kbd>D</kbd><br>
-        📱 移動：點擊螢幕左/右側 或 長按拖曳
+    <!-- 結束畫面 -->
+    <div id="end" class="scr h">
+      <h2>💥 任務結束</h2>
+      <div class="tabs">
+        <div class="tab act" data-t="stats">📊 數據</div>
+        <div class="tab" data-t="lb">🌐 排行榜</div>
+      </div>
+      <div id="t-stats">
+        <div class="stat-grid" id="sg"></div>
+        <button class="btn" id="rbtn">🔄 再戰一局</button>
+        <button class="btn sec" id="mbtn">🏠 主選單</button>
+      </div>
+      <div id="t-lb" class="h">
+        <table id="lbt"><thead><tr><th>#</th><th>玩家</th><th>分數</th></tr></thead><tbody></tbody></table>
+        <button class="btn" id="rbtn2">🔄 再戰一局</button>
       </div>
     </div>
 
-    <div id="game-over-screen" class="overlay hidden">
-      <h1 class="title">💥 碰撞！遊戲結束</h1>
-      <p class="subtitle" id="final-stats">最終距離: <span id="final-score">0</span>m</p>
-      <button class="btn" id="restart-btn">🔄 再玩一次</button>
+    <!-- 遊戲中 UI -->
+    <div id="hud" class="game-ui" style="pointer-events:none;display:none">
+      <div><div class="box"><div class="lbl">分數</div><div class="val" id="sc">0</div></div>
+      <div class="box" style="margin-top:4px"><div class="lbl">時間</div><div class="val" id="tm">60s</div></div></div>
+      <div style="text-align:right"><div class="box"><div class="lbl">HP</div><div id="hpBar"><div id="hpFill"></div></div></div></div>
+    </div>
+    <div id="wbar" class="game-ui">
+      <button class="wb act" data-w="pistol">🔫</button>
+      <button class="wb" data-w="smg">🔫💨</button>
+      <button class="wb" data-w="shotgun">💥</button>
+    </div>
+    <div id="attachTip" class="game-ui">🎒 當前配件: 無</div>
+    <div id="tc" class="game-ui">
+      <div id="mz" class="jz"><div class="jk"></div></div>
+      <div id="sz" class="jz"><div class="jk"></div></div>
     </div>
   </div>
 
-  <script>
-    /**
-     * Tunnel Dash v2.0
-     * 新增：障礙物生成系統、偽3D透視渲染、碰撞檢測、Game Over 流程
-     * 核心原則：requestAnimationFrame、 deltaTime、 鍵盤/觸控統一輸入、響應式 Canvas
-     */
+<script>
+/** Krunker-lite v1.5 | Iter6: MapGen + Attachments + NetSim + Fixed UI */
+"use strict";
 
-    // ===== 遊戲配置 =====
-    const CONFIG = {
-      canvas: { baseWidth: 800, baseHeight: 600, bg: '#0a0a1a' },
-      player: { radius: 18, speed: 420, color: '#00f5ff', glow: 'rgba(0,245,255,0.5)' },
-      tunnel: {
-        topWidth: 100, bottomWidth: 600, height: 480, segments: 12,
-        flowSpeed: 1.0, // z 單位移動速度
-        colors: { bg1: '#0a0a1a', bg2: '#101030', grid: 'rgba(0,100,200,0.25)', highlight: 'rgba(0,245,255,0.2)' }
-      },
-      obstacle: {
-        minInterval: 28, maxInterval: 50,
-        minGap: 0.30, maxGap: 0.48,
-        thicknessBase: 12, thicknessScale: 8
-      },
-      input: { touchZone: 0.5, lerp: 9 }
-    };
+const CFG = {
+  P: {spd:4.5, r:16, mhp:100},
+  W: {
+    pistol:   {rate:180, dmg:15, sp:0.05, auto:false, c:1, bspd:10},
+    smg:      {rate:60,  dmg:8,  sp:0.12, auto:true,  c:1, bspd:9},
+    shotgun:  {rate:600, dmg:20, sp:0.18, auto:false, c:5, bspd:11}
+  },
+  E: {r:18, hp:30, spd:1.8, dmg:8, si:1500, md:220, drop:.15, detectR:250},
+  PU: {
+    r:20, max:3, si:20000,
+    types:{hp:{sym:'+',col:'#2ecc71',eff:'heal',v:30},fr:{sym:'⚡',col:'#3498db',eff:'fr',v:2,d:10000},sh:{sym:'🛡️',col:'#9b59b6',eff:'sh',v:1,d:5000}}
+  },
+  ATT:{ // 配件
+    scope:{sym:'🔭',col:'#00bcd4',mod:{sp:-0.04},dur:0,desc:'擴散-40%'},
+    grip:{sym:'🔧',col:'#ff9800',mod:{rate:40},dur:0,desc:'射速+20ms'},
+    barrel:{sym:'🔩',col:'#9c27b0',mod:{bspd:4},dur:0,desc:'彈速+4px'}
+  },
+  TH:{neon:{bg:'#16213e',acc:'#4ecca3',txt:'#fff',pan:'rgba(26,26,46,0.95)'},dark:{bg:'#0d0d0d',acc:'#888',txt:'#ccc',pan:'rgba(13,13,13,0.96)'},day:{bg:'#eef2f6',acc:'#2c3e50',txt:'#111',pan:'rgba(255,255,255,0.96)'}}
+};
 
-    // ===== 遊戲狀態 =====
-    const state = {
-      running: false,
-      over: false,
-      score: 0,
-      highScore: parseInt(localStorage.getItem('td_highScore') || '0'),
-      lastTime: 0,
-      player: { x: 0, targetX: 0 },
-      obstacles: [],
-      nextSpawnScore: 30,
-      input: { left: false, right: false }
-    };
+// 安全存檔
+const DB = {
+  d:{h:0, k:0, v:.7, t:'neon', net:false, lb:[], ver:2},
+  load(){try{const s=JSON.parse(localStorage.getItem('kr_v15')); if(s.ver===this.d.ver) this.d={...this.d,...s};}catch(e){} return this.d;},
+  save(){try{localStorage.setItem('kr_v15',JSON.stringify(this.d));}catch(e){}}
+};
+DB.load();
 
-    // ===== DOM 引用 =====
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d', { alpha: false });
-    const scoreEl = document.getElementById('score');
-    const highScoreEl = document.getElementById('high-score');
-    const finalScoreEl = document.getElementById('final-score');
-    const hintEl = document.getElementById('hint');
-    const startScreen = document.getElementById('start-screen');
-    const gameOverScreen = document.getElementById('game-over-screen');
-    const startBtn = document.getElementById('start-btn');
-    const restartBtn = document.getElementById('restart-btn');
+const Theme = {
+  cur: DB.d.t,
+  apply(n){ this.cur=n; DB.d.t=n; DB.save(); const c=CFG.TH[n]; document.body.className=n;
+    document.documentElement.style.setProperty('--bg',c.bg);
+    document.documentElement.style.setProperty('--acc',c.acc);
+    document.documentElement.style.setProperty('--txt',c.txt);
+    document.documentElement.style.setProperty('--panel',c.pan); }
+};
+Theme.apply(DB.d.t);
 
-    // ===== Canvas 初始化與響應式 =====
-    function resizeCanvas() {
-      const dpr = window.devicePixelRatio || 1;
-      const box = document.getElementById('game-container');
-      const ratio = CONFIG.canvas.baseWidth / CONFIG.canvas.baseHeight;
-      let w = box.clientWidth, h = w / ratio;
-      if (h > box.clientHeight) { h = box.clientHeight; w = h * ratio; }
-      
-      canvas.style.width = `${w}px`; canvas.style.height = `${h}px`;
-      canvas.width = w * dpr; canvas.height = h * dpr;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+// 音效
+const Audio = {
+  ctx:null, on:true,
+  init(){ if(!this.ctx){this.ctx=new(window.AudioContext||window.webkitAudioContext)();}
+          if(this.ctx.state==='suspended') this.ctx.resume(); },
+  play(t){
+    if(!this.on||!this.ctx) return;
+    const now=this.ctx.currentTime, g=this.ctx.createGain();
+    g.gain.value=DB.d.v; g.connect(this.ctx.destination);
+    if(t==='s'){const o=this.ctx.createOscillator();o.type='square';o.frequency.value=400;g.gain.exponentialRampToValueAtTime(.01,now+.08);o.connect(g);o.start();o.stop(now+.1)}
+    else if(t==='h'){const b=this.ctx.createBuffer(1,this.ctx.sampleRate*.1,this.ctx.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;const s=this.ctx.createBufferSource();s.buffer=b;const f=this.ctx.createBiquadFilter();f.type='lowpass';f.frequency.value=900;s.connect(f).connect(g);s.start()}
+    else if(t==='x'){const o=this.ctx.createOscillator();o.type='sawtooth';o.frequency.setValueAtTime(200,now);o.frequency.exponentialRampToValueAtTime(50,now+.25);g.gain.exponentialRampToValueAtTime(.01,now+.25);o.connect(g);o.start();o.stop(now+.3)}
+    else if(t==='p'){[880,1100,1320].forEach((f,i)=>setTimeout(()=>{const o=this.ctx.createOscillator();const g2=this.ctx.createGain();g2.gain.value=DB.d.v;o.frequency.value=f;o.connect(g2).connect(this.ctx.destination);o.start();o.stop(this.ctx.currentTime+.1)},i*50))}
+    else if(t==='net'){const o=this.ctx.createOscillator();o.type='sine';o.frequency.setValueAtTime(600,now);o.frequency.linearRampToValueAtTime(800,now+.1);o.connect(g);o.start();o.stop(now+.15)}
+  }
+};
 
-      CONFIG.tunnel.bottomWidth = w * 0.78;
-      CONFIG.player.baseX = w / 2;
-      CONFIG.player.y = h * 0.78;
-      state.player.x = CONFIG.player.baseX;
-      state.player.targetX = CONFIG.player.baseX;
-    }
+// 輸入管理
+const In = {
+  k:{}, m:{x:0,y:0,d:false}, t:{m:{a:false,x:0,y:0,sx:0,sy:0}, s:{a:false}},
+  init(cv){
+    window.addEventListener('keydown', e=>{
+      this.k[e.key.toLowerCase()]=true;
+      if(e.key===' ') Game.player?.shoot();
+      if(e.key==='q'||e.key==='ArrowLeft') Game.cycleW(-1);
+      if(e.key==='e'||e.key==='Tab'||e.key==='ArrowRight') Game.cycleW(1);
+    });
+    window.addEventListener('keyup', e=>this.k[e.key.toLowerCase()]=false);
+    
+    const um=e=>{const r=cv.getBoundingClientRect();this.m.x=e.clientX-r.left;this.m.y=e.clientY-r.top;};
+    cv.addEventListener('mousemove', um);
+    cv.addEventListener('mousedown', e=>{if(e.button===0){um(e);this.m.d=true;Game.player?.shoot();}});
+    cv.addEventListener('mouseup', ()=>this.m.d=false);
+    cv.addEventListener('contextmenu', e=>e.preventDefault());
 
-    // ===== 輸入系統 =====
-    const Input = {
-      init() {
-        const toggle = (k, v) => {
-          if (k === 'ArrowLeft' || k === 'a' || k === 'A') state.input.left = v;
-          if (k === 'ArrowRight' || k === 'd' || k === 'D') state.input.right = v;
-        };
-        window.addEventListener('keydown', e => { e.preventDefault(); toggle(e.key, true); });
-        window.addEventListener('keyup', e => { toggle(e.key, false); });
+    // 觸控
+    const mz=document.getElementById('mz'), sz=document.getElementById('sz');
+    mz.addEventListener('touchstart', e=>{e.preventDefault();const t=e.touches[0],r=mz.getBoundingClientRect();this.t.m={a:true,sx:r.left+r.width/2,sy:r.top+r.height/2,x:t.clientX,y:t.clientY};mz.classList.add('active');},{passive:false});
+    mz.addEventListener('touchmove', e=>{if(this.t.m.a){e.preventDefault();const t=e.touches[0];this.t.m.x=t.clientX;this.t.m.y=t.clientY;}},{passive:false});
+    const em=e=>{e?.preventDefault();this.t.m.a=false;mz?.classList.remove('active');};
+    mz.addEventListener('touchend', em); mz.addEventListener('touchcancel', em);
+    sz.addEventListener('touchstart', e=>{e.preventDefault();this.t.s.a=true;sz.classList.add('active');Game.player?.shoot();},{passive:false});
+    sz.addEventListener('touchend', ()=>{this.t.s.a=false;sz.classList.remove('active');});
 
-        const handleTouch = e => {
-          e.preventDefault();
-          if (!state.running) return;
-          const x = e.touches[0].clientX;
-          const mid = window.innerWidth / 2;
-          state.input.left = x < mid;
-          state.input.right = x >= mid;
-        };
-        const clearTouch = () => { state.input.left = false; state.input.right = false; };
+    // UI 按鈕
+    document.querySelectorAll('.wb').forEach(b=>b.addEventListener('click', ()=>Game.setWeapon(b.dataset.w)));
+    document.getElementById('abtn').addEventListener('click', ()=>{Audio.init();Audio.on=!Audio.on;document.getElementById('abtn').textContent=Audio.on?'🔊':'🔇';document.getElementById('abtn').classList.toggle('muted',!Audio.on);});
+    document.getElementById('tbtn').addEventListener('click', ()=>{const n=['neon','dark','day'];Theme.apply(n[(n.indexOf(Theme.cur)+1)%3]);});
+    document.getElementById('nbtn').addEventListener('click', ()=>{DB.d.net=!DB.d.net;DB.save();document.getElementById('nbtn').classList.toggle('net-on',DB.d.net);if(DB.d.net)Game.net.connect();else Game.net.disconnect();Audio.play('net');});
+    document.getElementById('rbtn').addEventListener('click', ()=>Game.start());
+    document.getElementById('rbtn2').addEventListener('click', ()=>Game.start());
+    document.getElementById('mbtn').addEventListener('click', ()=>{Game.state='menu';document.body.classList.remove('playing');document.getElementById('end').classList.add('h');document.getElementById('start').classList.remove('h');});
+    document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
+      document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('act',x.dataset.t===t.dataset.t));
+      document.getElementById('t-stats').classList.toggle('h',t.dataset.t!=='stats');
+      document.getElementById('t-lb').classList.toggle('h',t.dataset.t!=='lb');
+    }));
+  },
+  vec(){
+    let dx=0,dy=0;
+    if(this.k.w||this.k.arrowup)dy-=1;if(this.k.s||this.k.arrowdown)dy+=1;
+    if(this.k.a||this.k.arrowleft)dx-=1;if(this.k.d||this.k.arrowright)dx+=1;
+    if(this.t.m.a){dx+=(this.t.m.x-this.t.m.sx)/40;dy+=(this.t.m.y-this.t.m.sy)/40;}
+    if(dx||dy){const l=Math.hypot(dx,dy);if(l>1){dx/=l;dy/=l;}return{x:dx,y:dy};}
+    return{x:0,y:0};
+  }
+};
 
-        canvas.addEventListener('touchstart', handleTouch, { passive: false });
-        canvas.addEventListener('touchmove', handleTouch, { passive: false });
-        canvas.addEventListener('touchend', clearTouch, { passive: false });
-        canvas.addEventListener('touchcancel', clearTouch, { passive: false });
+// 離屏快取
+const Spr = {p:null, e:null, init(){this.p=this._d('#4ecca3');this.e=this._d('#ff6b6b')},
+  _d(c){const v=new OffscreenCanvas(32,32),x=v.getContext('2d');x.imageSmoothingEnabled=false;
+    ['..##..','.#**#.','#*##*#','*####*','#****#','*##**#','.**..#','.##...'].forEach((r,y)=>{for(let i=0;i<r.length;i++){const ch=r[i];x.fillStyle=ch==='#'?'#111':ch==='*'?c:'rgba(100,100,100,0.5)';x.fillRect(i*2,y*2,2,2)}});return v;}};
 
-        canvas.addEventListener('mousedown', e => {
-          if (!state.running) return;
-          state.input.left = e.clientX < window.innerWidth / 2;
-          state.input.right = !state.input.left;
-        });
-        canvas.addEventListener('mouseup', clearTouch);
-        window.addEventListener('resize', resizeCanvas);
-      },
-      update(dt) {
-        const move = CONFIG.player.speed * dt;
-        if (state.input.left) state.player.targetX -= move;
-        if (state.input.right) state.player.targetX += move;
+// 物件類別
+class Pt{a=false;x=0;y=0;vx=0;vy=0;l=400;ml=400;r=2;c='#fff';
+  reset(x,y,c){this.x=x;this.y=y;const a=Math.random()*Math.PI*2,s=Math.random()*2.5+1;this.vx=Math.cos(a)*s;this.vy=Math.sin(a)*s;this.l=400;this.ml=this.l;this.r=Math.random()*2.5+1.5;this.c=c;this.a=true;}
+  u(dt){this.x+=this.vx;this.y+=this.vy;this.l-=dt;this.r*=.96;return this.l<=0||this.r<.5;}
+  d(ctx){if(!this.a)return;ctx.globalAlpha=this.l/this.ml;ctx.fillStyle=this.c;ctx.beginPath();ctx.arc(this.x,this.y,this.r,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;}}
+class Bl{a=false;x=0;y=0;vx=0;vy=0;dmg=15;r=4;
+  reset(x,y,ang,w){const wep=Game.getWeaponMod(w);this.x=x;this.y=y;this.dmg=wep.dmg;const sp=(Math.random()-.5)*wep.sp*2;this.vx=Math.cos(ang+sp)*wep.bspd;this.vy=Math.sin(ang+sp)*wep.bspd;this.a=true;}
+  u(){this.x+=this.vx;this.y+=this.vy;if(this.x<-20||this.x>Game.cv.width+20||this.y<-20||this.y>Game.cv.height+20)this.a=false;
+    for(const o of Game.obs)if(this.x>o.x&&this.x<o.x+o.w&&this.y>o.y&&this.y<o.y+o.h){this.a=false;for(let i=0;i<2;i++)Game.spawnPt(this.x,this.y,'#aaa')}}
+  d(ctx){if(!this.a)return;ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(this.x,this.y,this.r,0,Math.PI*2);ctx.fill();}}
+class En{a=false;x=0;y=0;r=18;hp=30;mhp=30;spd=1.8;tgt=null;cd=0;st='P';ptX=0;ptY=0;stT=0;
+  reset(x,y,t){this.x=x;this.y=y;this.hp=30;this.mhp=30;this.tgt=t;this.cd=0;this.a=true;this.st='P';this.stT=0;this.pickPatrol();}
+  pickPatrol(){this.ptX=100+Math.random()*(Game.cv.width-200);this.ptY=100+Math.random()*(Game.cv.height-200);}
+  u(dt){if(!this.tgt||!this.a)return;const dx=this.tgt.x-this.x,dy=this.tgt.y-this.y,dist=Math.hypot(dx,dy);
+    if(this.hp/this.mhp<=.3)this.st='F';else if(dist<CFG.E.detectR)this.st='C';else if(this.st!=='P')this.st='P';
+    let vx=0,vy=0;
+    if(this.st==='C'){vx=dx;vy=dy;this.spd=1.8*1.2}else if(this.st==='F'){vx=-dx;vy=-dy;this.spd=1.8*1.1}
+    else{const pdx=this.ptX-this.x,pdy=this.ptY-this.y;if(Math.hypot(pdx,pdy)<20)this.pickPatrol();vx=pdx;vy=pdy;this.spd=1.8}
+    const len=Math.hypot(vx,vy);if(len>0){vx/=len;vy/=len;this.x+=vx*this.spd;this.y+=vy*this.spd}
+    this.stT+=dt;if(this.stT>1500){this.x+=(Math.random()-.5)*15;this.y+=(Math.random()-.5)*15;this.stT=0}
+    Game.push(this);if(this.cd>0)this.cd-=dt;}
+  d(ctx){if(!this.a)return;ctx.drawImage(Spr.e,this.x-16,this.y-16);ctx.strokeStyle=this.st==='C'?'#f00':this.st==='F'?'#9b59b6':'#fff';ctx.lineWidth=2;ctx.beginPath();ctx.arc(this.x,this.y,this.r,0,Math.PI*2);ctx.stroke();const p=this.hp/this.mhp;ctx.fillStyle='#333';ctx.fillRect(this.x-18,this.y-this.r-10,36,5);ctx.fillStyle=p>.5?'#4ecca3':p>.25?'#f9c74f':'#ff6b6b';ctx.fillRect(this.x-18,this.y-this.r-10,36*p,5);}
+  hit(d){this.hp-=d;return this.hp<=0;}}
+class Pu{a=false;x=0;y=0;tp='hp';cfg={};col=false;pulse=0;rot=0;
+  reset(x,y,tp){this.x=x;this.y=y;this.tp=tp;this.cfg=CFG.PU.types[tp]||CFG.ATT[tp];this.a=true;this.col=false;}
+  u(){this.pulse=(Math.sin(Date.now()/200)+1)*.15+1;this.rot+=.03;}
+  d(ctx){if(!this.a||this.col)return;ctx.save();ctx.translate(this.x,this.y);ctx.rotate(this.rot);const s=18*this.pulse;ctx.strokeStyle=this.cfg.col;ctx.lineWidth=2;ctx.globalAlpha=.7;ctx.beginPath();ctx.arc(0,0,s+4,0,Math.PI*2);ctx.stroke();ctx.globalAlpha=1;ctx.fillStyle=this.cfg.col;ctx.beginPath();ctx.arc(0,0,s,0,Math.PI*2);ctx.fill();ctx.fillStyle='#fff';ctx.font='bold 14px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(this.cfg.sym,0,1);ctx.restore();}}
+class Pl{x=0;y=0;r=16;spd=4.5;hp=100;mhp=100;a=0;wep='pistol';lf=0;fl=0;buffs={};attach={};
+  init(x,y){this.x=x;this.y=y;this.hp=100;this.mhp=100;this.a=0;this.wep='pistol';this.lf=0;this.fl=0;this.buffs={};this.attach={};}
+  u(dt){const m=In.vec();if(m.x||m.y){this.x+=m.x*this.spd;this.y+=m.y*this.spd;this.a=Math.atan2(m.y,m.x)}
+    if(In.m.x&&In.m.y)this.a=Math.atan2(In.m.y-this.y,In.m.x-this.x);
+    Game.push(this);if(this.fl>0)this.fl-=dt;const now=Date.now();for(const k in this.buffs)if(this.buffs[k].e<now)delete this.buffs[k];}
+  dmg(a){if(this.buffs.sh)return false;this.hp-=a;this.fl=150;return this.hp<=0;}
+  apply(tp){const c=CFG.PU.types[tp]||CFG.ATT[tp];if(c.eff==='heal')this.hp=Math.min(this.mhp,this.hp+c.v);else if(c.mod){this.attach[tp]={...c.mod,e:Date.now()+(c.d||30000)};Game.showAttach();}else this.buffs[c.eff]={e:Date.now()+(c.d||0)};Audio.play('p');}
+  shoot(){const now=Date.now();const wep=Game.getWeaponMod(this.wep);if(now-this.lf<wep.rate)return;this.lf=now;Audio.play('s');const bx=this.x+Math.cos(this.a)*(this.r+5),by=this.y+Math.sin(this.a)*(this.r+5);for(let i=0;i<wep.c;i++){const b=Game.bls.find(x=>!x.a);if(b)b.reset(bx,by,this.a,this.wep);}}
+  d(ctx){ctx.save();ctx.translate(this.x,this.y);ctx.rotate(this.a);if(this.fl>0&&Math.floor(this.fl/50)%2===0){ctx.globalAlpha=.6;ctx.fillStyle='#ff6b6b'}else ctx.fillStyle=CFG.TH[Theme.cur].acc;ctx.drawImage(Spr.p,-16,-16);ctx.restore();ctx.globalAlpha=1;if(this.buffs.sh){ctx.strokeStyle='rgba(155,89,182,0.8)';ctx.lineWidth=3;ctx.globalAlpha=.6+Math.sin(Date.now()/100)*.2;ctx.beginPath();ctx.arc(this.x,this.y,this.r+8,0,Math.PI*2);ctx.stroke();ctx.globalAlpha=1;}}}
+class Ob{x=0;y=0;w=0;h=0;constructor(x,y,w,h){this.x=x;this.y=y;this.w=w;this.h=h}d(ctx){ctx.fillStyle='#3a3a4a';ctx.fillRect(this.x,this.y,this.w,this.h);ctx.strokeStyle='#666';ctx.lineWidth=2;ctx.strokeRect(this.x,this.y,this.w,this.h);}}
 
-        const limit = CONFIG.tunnel.bottomWidth / 2 - CONFIG.player.radius - 5;
-        state.player.targetX = Math.max(CONFIG.player.baseX - limit, Math.min(CONFIG.player.baseX + limit, state.player.targetX));
+// 動態地圖生成
+const MapGen = {
+  generate(cv, count){
+    const obs=[], gs=60, cols=Math.floor(cv.width/gs), rows=Math.floor(cv.height/gs);
+    const types=['cluster','corridor','open'];
+    const type=types[Math.floor(Math.random()*types.length)];
+    for(let i=0;i<count;i++){
+      let x,y,w,h,valid=false,attempts=0;
+      while(!valid&&attempts<50){
+        w=gs*(1+Math.floor(Math.random()*2)); h=gs*(1+Math.floor(Math.random()*2));
+        if(type==='cluster'){x=gs*(2+Math.floor(Math.random()*(cols-4)));y=gs*(2+Math.floor(Math.random()*(rows-4)));}
+        else if(type==='corridor'){x=gs*(1+Math.floor(Math.random()*(cols-2)));y=gs*(Math.floor(Math.random()*rows));if(y>rows/2)y-=gs;}
+        else{x=gs*(1+Math.floor(Math.random()*(cols-2)));y=gs*(1+Math.floor(Math.random()*(rows-2)));}
+        // 確保不重疊且離中心遠
+        const cx=x+w/2, cy=y+h/2;
+        if(Math.hypot(cx-cv.width/2,cy-cv.height/2)>gs*3){valid=!obs.some(o=>!(x+w<o.x||x>o.x+o.w||y+h<o.y||y>o.y+o.h));}
+        attempts++;
       }
-    };
-
-    // ===== 障礙物系統 =====
-    function spawnObstacle() {
-      const gapW = CONFIG.obstacle.minGap + Math.random() * (CONFIG.obstacle.maxGap - CONFIG.obstacle.minGap);
-      // 缺口位置 (-1 ~ 1)，避免貼邊
-      const gapX = (Math.random() * 2 - 1) * (1 - gapW * 0.6); 
-      state.obstacles.push({ z: 0, gapX, gapW, checked: false });
+      if(valid)obs.push(new Ob(x,y,w,h));
     }
+    return obs;
+  }
+};
 
-    function updateObstacles(dt) {
-      // 生成邏輯
-      if (state.score >= state.nextSpawnScore) {
-        spawnObstacle();
-        state.nextSpawnScore += CONFIG.obstacle.minInterval + Math.random() * (CONFIG.obstacle.maxInterval - CONFIG.obstacle.minInterval);
-      }
+// 網路模擬 (BroadcastChannel)
+const Net = {
+  ch:null, peers:{}, id:Math.random().toString(36).slice(2,8),
+  connect(){
+    try{this.ch=new BroadcastChannel('krunker_lite');this.ch.onmessage=e=>{this.peers[e.data.id]=e.data;}
+    setInterval(()=>{if(Game.state==='play'&&Game.player)this.broadcast({x:Game.player.x,y:Game.player.y,hp:Game.player.hp,sc:Game.score,wep:Game.player.wep,a:Game.player.a});},50);
+    }catch(e){console.warn('Net init fail',e);}
+  },
+  disconnect(){if(this.ch)this.ch.close();this.ch=null;this.peers={};},
+  broadcast(data){if(this.ch)this.ch.postMessage({...data,id:this.id});}
+};
 
-      const speed = CONFIG.tunnel.flowSpeed;
-      const tunnelW = CONFIG.tunnel.bottomWidth;
-      const centerX = CONFIG.player.baseX;
-      const pLeft = state.player.x - CONFIG.player.radius + 4; // +4 緩衝提升手感
-      const pRight = state.player.x + CONFIG.player.radius - 4;
-
-      for (let i = state.obstacles.length - 1; i >= 0; i--) {
-        const obs = state.obstacles[i];
-        obs.z += speed * dt;
-
-        // 碰撞判定 (z接近玩家平面)
-        if (obs.z > 0.88 && !obs.checked) {
-          const gapCenter = centerX + obs.gapX * (tunnelW / 2);
-          const halfGap = (obs.gapW * tunnelW) / 2;
-          if (pRight < gapCenter - halfGap || pLeft > gapCenter + halfGap) {
-            triggerGameOver();
-            return;
-          }
-          obs.checked = true;
-        }
-
-        // 清理超出視野
-        if (obs.z > 1.25) state.obstacles.splice(i, 1);
-      }
+// 主遊戲
+const Game = {
+  cv:null, ctx:null, state:'menu', player:null, obs:[], bls:[], pts:[], ens:[], pus:[], ghosts:[],
+  score:0, timeLeft:60, lastTime:0, spawnT:0, puT:0,
+  stats:{kills:0,shotsFired:0,shotsHit:0,maxStreak:0,damageTaken:0,puCollected:0,time:0},
+  
+  init(){
+    this.cv=document.getElementById('c'); this.ctx=this.cv.getContext('2d');
+    this.resize(); window.addEventListener('resize',()=>this.resize());
+    Spr.init(); In.init(this.cv);
+    for(let i=0;i<40;i++)this.bls.push(new Bl); for(let i=0;i<180;i++)this.pts.push(new Pt);
+    for(let i=0;i<25;i++)this.ens.push(new En); for(let i=0;i<8;i++)this.pus.push(new Pu);
+    document.getElementById('hs').textContent=DB.d.h;
+    document.getElementById('nbtn').classList.toggle('net-on',DB.d.net);
+    if(DB.d.net)Net.connect();
+    this.loop(0);
+    // 修復綁定
+    document.getElementById('sbtn').addEventListener('click', ()=>{Audio.init();this.start();});
+  },
+  resize(){this.cv.width=window.innerWidth;this.cv.height=window.innerHeight;},
+  getWeaponMod(key){const w=CFG.W[key];const a=this.player?this.player.attach:{};
+    let rate=w.rate, sp=w.sp, bspd=w.bspd, dmg=w.dmg, c=w.c;
+    if(a.grip)rate=Math.max(20,rate-a.grip); if(a.scope)sp=Math.max(.01,sp+a.scope); if(a.barrel)bspd+=a.barrel;
+    return{rate,dmg,sp,auto:w.auto,c,bspd};},
+  showAttach(){const p=this.player,keys=Object.keys(p.attach);
+    document.getElementById('attachTip').textContent=keys.length?`🎒 配件: ${keys.map(k=>CFG.ATT[k].sym).join(' ')}`:'🎒 當前配件: 無';},
+  start(){
+    this.state='play'; document.body.classList.add('playing');
+    this.player=new Pl; this.player.init(this.cv.width/2,this.cv.height/2);
+    this.score=0; this.timeLeft=60; this.spawnT=0; this.puT=0;
+    this.stats={kills:0,shotsFired:0,shotsHit:0,maxStreak:0,damageTaken:0,puCollected:0,time:0};
+    this.obs=MapGen.generate(this.cv, 5+Math.floor(Math.random()*4));
+    this.bls.forEach(b=>b.a=false); this.ens.forEach(e=>e.a=false); this.pus.forEach(p=>p.a=false);
+    document.getElementById('start').classList.add('h'); document.getElementById('end').classList.add('h');
+    document.getElementById('hud').style.display='flex'; document.getElementById('wbar').style.display='flex';
+    document.getElementById('tc').style.display='block'; document.getElementById('attachTip').style.display='block';
+    this.updateUI();
+  },
+  push(o){for(const r of this.obs){const cx=Math.max(r.x,Math.min(o.x,r.x+r.w)),cy=Math.max(r.y,Math.min(o.y,r.y+r.h)),dx=o.x-cx,dy=o.y-cy,d=Math.hypot(dx,dy);if(d<o.r){if(d===0)o.x=r.x-20;else{o.x+=dx/d*(o.r-d);o.y+=dy/d*(o.r-d)}}}},
+  spawnPt(x,y,c){const p=this.pts.find(x=>!x.a);if(p)p.reset(x,y,c);},
+  setWeapon(w){if(!CFG.W[w])return;this.player.wep=w;document.querySelectorAll('.wb').forEach(b=>b.classList.toggle('act',b.dataset.w===w));},
+  cycleW(d){const k=Object.keys(CFG.W);let i=k.indexOf(this.player.wep);this.setWeapon(k[(i+d+k.length)%k.length]);},
+  over(){
+    this.state='end'; document.body.classList.remove('playing');
+    document.getElementById('hud').style.display='none'; document.getElementById('wbar').style.display='none';
+    document.getElementById('tc').style.display='none'; document.getElementById('attachTip').style.display='none';
+    document.getElementById('end').classList.remove('h');
+    this.stats.time=60-this.timeLeft;
+    if(this.score>DB.d.h){DB.d.h=this.score;DB.save();document.getElementById('hs').textContent=this.score;}
+    this.renderStats(); this.renderLB(); Audio.play('x');
+  },
+  renderStats(){const s=this.stats,acc=s.shotsFired>0?Math.round(s.shotsHit/s.shotsFired*100):0;
+    document.getElementById('sg').innerHTML=`<div class="stat-row"><span>擊殺</span><b>${s.kills}</b></div><div class="stat-row"><span>存活</span><b>${s.time}s</b></div><div class="stat-row"><span>命中率</span><b>${acc}%</b></div><div class="stat-row"><span>最高連殺</span><b>${s.maxStreak}</b></div><div class="stat-row"><span>承受傷害</span><b>${s.damageTaken}</b></div><div class="stat-row"><span>道具/配件</span><b>${s.puCollected}</b></div>`;},
+  renderLB(){const names=['Bot_Alpha','Neon_X','Krunker_God','Ghost_9','Ace_Viper'];const lb=[...names.map((n,i)=>({name:n,sc:50+Math.floor(Math.random()*300)})),{name:'You (Local)',sc:this.score}];lb.sort((a,b)=>b.sc-a.sc);
+    const tb=document.querySelector('#lbt tbody');tb.innerHTML='';lb.slice(0,8).forEach((r,i)=>{const tr=document.createElement('tr');tr.innerHTML=`<td>${i+1}</td><td style="color:${r.name.includes('You')?'var(--acc)':'#fff'}">${r.name}</td><td>${r.sc}</td>`;tb.appendChild(tr);});},
+  updateUI(){document.getElementById('sc').textContent=this.score;document.getElementById('tm').textContent=Math.ceil(this.timeLeft)+'s';const p=Math.max(0,this.player.hp/this.player.mhp*100);const f=document.getElementById('hpFill');f.style.width=p+'%';f.classList.toggle('low',p<30);},
+  loop(ts){const dt=Math.min((ts-this.lastTime)/1000,.05);this.lastTime=ts;if(this.state==='play')this.update(dt*1000);this.draw();requestAnimationFrame(t=>this.loop(t));},
+  update(dt){
+    this.timeLeft-=dt/1000;if(this.timeLeft<=0){this.timeLeft=0;this.over();return;}
+    this.player.u(dt);const wep=Game.getWeaponMod(this.player.wep);if(wep.auto&&(In.m.d||In.t.s.a))this.player.shoot();
+    this.bls.forEach(b=>{if(!b.a)return;b.u();if(!b.a)return;for(const e of this.ens){if(!e.a)continue;if(Math.hypot(b.x-e.x,b.y-e.y)<b.r+e.r){b.a=false;this.stats.shotsFired++;
+      if(e.hit(b.dmg)){e.a=false;this.score+=10;this.stats.kills++;this.stats.shotsHit++;if(this.stats.kills%5===0&&this.stats.kills>this.stats.maxStreak)this.stats.maxStreak=this.stats.kills;
+      for(let i=0;i<6;i++)this.spawnPt(e.x,e.y,'#f00');Audio.play('x');
+      if(Math.random()<CFG.E.drop){const p=this.pus.find(x=>!x.a);if(p){const keys=[...Object.keys(CFG.PU.types),...Object.keys(CFG.ATT)];p.reset(e.x,e.y,keys[Math.floor(Math.random()*keys.length)]);}}
+      }else{for(let i=0;i<2;i++)this.spawnPt(b.x,b.y,'#fff');}}}});
+    this.spawnT+=dt;if(this.spawnT>=CFG.E.si/Math.max(1,this.stats.kills*.05)){this.spawnT=0;const e=this.ens.find(x=>!x.a);if(e){let ex,ey;do{ex=Math.random()<.5?(Math.random()<.5?-20:this.cv.width+20):Math.random()*this.cv.width;ey=Math.random()<.5?(Math.random()<.5?-20:this.cv.height+20):Math.random()*this.cv.height}while(Math.hypot(ex-this.player.x,ey-this.player.y)<CFG.E.md);e.reset(ex,ey,this.player);}}
+    this.ens.forEach(e=>{if(!e.a)return;e.u(dt);if(Math.hypot(e.x-this.player.x,e.y-this.player.y)<e.r+this.player.r&&e.cd<=0){if(this.player.dmg(CFG.E.dmg)){this.over();return;}e.cd=500;this.stats.damageTaken+=CFG.E.dmg;}});
+    this.puT+=dt;if(this.puT>=CFG.PU.si){this.puT=0;if(this.pus.filter(x=>x.a&&!x.col).length<CFG.PU.max){const p=this.pus.find(x=>!x.a);if(p){const keys=[...Object.keys(CFG.PU.types),...Object.keys(CFG.ATT)];p.reset(50+Math.random()*(this.cv.width-100),50+Math.random()*(this.cv.height-100),keys[Math.floor(Math.random()*keys.length)]);}}}
+    this.pus.forEach(w=>{if(!w.a||w.col)return;w.u();if(Math.hypot(w.x-this.player.x,w.y-this.player.y)<w.r*1.3+this.player.r){w.col=true;this.player.apply(w.tp);w.a=false;this.stats.puCollected++;for(let i=0;i<8;i++)this.spawnPt(w.x,w.y,w.cfg.col);}});
+    this.pts.forEach(p=>{if(!p.a)return;if(p.u(dt))p.a=false;});
+    this.updateUI();
+  },
+  draw(){
+    this.ctx.fillStyle=CFG.TH[Theme.cur].bg; this.ctx.fillRect(0,0,this.cv.width,this.cv.height);
+    this.ctx.strokeStyle='rgba(128,128,128,.1)'; this.ctx.lineWidth=1;
+    for(let x=0;x<this.cv.width;x+=CFG.G){this.ctx.beginPath();this.ctx.moveTo(x,0);this.ctx.lineTo(x,this.cv.height);this.ctx.stroke();}
+    for(let y=0;y<this.cv.height;y+=CFG.G){this.ctx.beginPath();this.ctx.moveTo(0,y);this.ctx.lineTo(this.cv.width,y);this.ctx.stroke();}
+    if(this.state==='play'||this.state==='end'){
+      this.obs.forEach(o=>o.d(this.ctx));
+      this.pts.filter(x=>x.a).forEach(x=>x.d(this.ctx));
+      this.bls.filter(x=>x.a).forEach(x=>x.d(this.ctx));
+      this.ens.filter(x=>x.a).forEach(x=>x.d(this.ctx));
+      this.pus.filter(x=>x.a&&!x.col).forEach(x=>x.d(this.ctx));
+      // 繪製幽靈玩家
+      for(const[id,p]of Object.entries(Net.peers)){if(Date.now()-(p._t||0)>2000)continue;this.ctx.globalAlpha=.6;this.ctx.fillStyle='#f39c12';this.ctx.beginPath();this.ctx.arc(p.x,p.y,16,0,Math.PI*2);this.ctx.fill();this.ctx.fillStyle='#fff';this.ctx.font='10px sans-serif';this.ctx.fillText(id.slice(0,4),p.x-8,p.y-22);this.ctx.globalAlpha=1;}
+      if(this.player)this.player.d(this.ctx);
     }
+  }
+};
 
-    // ===== 渲染系統 =====
-    function renderTunnel(time) {
-      const { topWidth, bottomWidth, height, segments, colors } = CONFIG.tunnel;
-      const cx = CONFIG.player.baseX;
-      const topY = 60, bottomY = topY + height;
-
-      // 背景漸層
-      const bg = ctx.createLinearGradient(0, topY, 0, bottomY);
-      bg.addColorStop(0, colors.bg2); bg.addColorStop(1, colors.bg1);
-      ctx.fillStyle = bg; ctx.fillRect(0, topY, canvas.width, height);
-
-      // 網格流動
-      const offset = (time * 120) % height;
-      ctx.strokeStyle = colors.grid; ctx.lineWidth = 2;
-      for (let i = 0; i < segments + 1; i++) {
-        let y = topY + (i / segments) * height + offset;
-        if (y > bottomY) y -= height;
-        const t = (y - topY) / height;
-        const w = topWidth + (bottomWidth - topWidth) * t;
-        ctx.beginPath(); ctx.moveTo(cx - w/2, y); ctx.lineTo(cx + w/2, y); ctx.stroke();
-      }
-
-      // 邊框光暈
-      ctx.shadowBlur = 20; ctx.shadowColor = colors.highlight;
-      ctx.strokeStyle = colors.highlight; ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(cx - topWidth/2, topY); ctx.lineTo(cx - bottomWidth/2, bottomY);
-      ctx.moveTo(cx + topWidth/2, topY); ctx.lineTo(cx + bottomWidth/2, bottomY);
-      ctx.stroke(); ctx.shadowBlur = 0;
-    }
-
-    function renderObstacles() {
-      const { topWidth, bottomWidth, height, segments } = CONFIG.tunnel;
-      const cx = CONFIG.player.baseX;
-      const topY = 60;
-      const thickScale = CONFIG.obstacle.thicknessScale;
-
-      state.obstacles.forEach(obs => {
-        if (obs.checked && state.over) return; // 碰撞後不重繪剛碰到的
-        
-        const y = topY + obs.z * height;
-        if (y < topY || y > topY + height + 20) return; // 視口裁切
-        
-        const w = topWidth + (bottomWidth - topWidth) * obs.z;
-        const thickness = CONFIG.obstacle.thicknessBase + obs.z * thickScale;
-        const gapCX = cx + obs.gapX * (w / 2);
-        const gapHalf = (obs.gapW * w) / 2;
-        
-        // 霓虹障礙牆 (左半)
-        ctx.fillStyle = '#ff3366';
-        ctx.fillRect(cx - w/2, y, gapCX - gapHalf - (cx - w/2), thickness);
-        // 右半
-        ctx.fillRect(gapCX + gapHalf, y, (cx + w/2) - (gapCX + gapHalf), thickness);
-        
-        // 邊緣高亮
-        ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1;
-        ctx.strokeRect(cx - w/2, y, w, thickness);
-      });
-    }
-
-    function renderPlayer() {
-      const { x, y, radius, color, glow } = CONFIG.player;
-      ctx.shadowBlur = 18; ctx.shadowColor = glow;
-      ctx.fillStyle = glow;
-      ctx.beginPath(); ctx.arc(x, y, radius + 6, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = color;
-      ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI * 2); ctx.fill();
-      ctx.shadowBlur = 0;
-      // 高光
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath(); ctx.arc(x - radius*0.35, y - radius*0.35, radius*0.25, 0, Math.PI*2); ctx.fill();
-    }
-
-    // ===== 遊戲循環 =====
-    function loop(ts) {
-      if (!state.lastTime) state.lastTime = ts;
-      const dt = Math.min((ts - state.lastTime) / 1000, 0.08);
-      state.lastTime = ts;
-
-      if (state.running && !state.over) {
-        state.score += dt * 65; // 基礎計分速率
-        Input.update(dt);
-        state.player.x += (state.player.targetX - state.player.x) * CONFIG.input.lerp * dt;
-        updateObstacles(dt);
-        
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        renderTunnel(ts / 1000);
-        renderObstacles();
-        renderPlayer();
-        scoreEl.textContent = Math.floor(state.score);
-      }
-      
-      requestAnimationFrame(loop);
-    }
-
-    // ===== 狀態控制 =====
-    function startGame() {
-      state.running = true; state.over = false;
-      state.score = 0; state.obstacles = []; state.nextSpawnScore = 30;
-      state.player.x = CONFIG.player.baseX;
-      state.player.targetX = CONFIG.player.baseX;
-      state.input = { left: false, right: false };
-      
-      startScreen.classList.add('hidden');
-      gameOverScreen.classList.add('hidden');
-      hintEl.style.display = 'block';
-      state.lastTime = 0;
-    }
-
-    function triggerGameOver() {
-      state.over = true; state.running = false;
-      if (state.score > state.highScore) {
-        state.highScore = Math.floor(state.score);
-        localStorage.setItem('td_highScore', state.highScore);
-      }
-      finalScoreEl.textContent = Math.floor(state.score);
-      highScoreEl.textContent = state.highScore;
-      gameOverScreen.classList.remove('hidden');
-      hintEl.style.display = 'none';
-    }
-
-    // ===== 初始化 =====
-    function init() {
-      resizeCanvas(); Input.init();
-      highScoreEl.textContent = state.highScore;
-      startBtn.addEventListener('click', startGame);
-      restartBtn.addEventListener('click', startGame);
-      requestAnimationFrame(loop);
-      console.log('🎮 Tunnel Dash v2.0 Ready');
-    }
-    window.addEventListener('load', init);
-  </script>
+window.addEventListener('DOMContentLoaded', ()=>Game.init());
+</script>
 </body>
 </html>
