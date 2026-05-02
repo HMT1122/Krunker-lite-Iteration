@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Tunnel Dash - 極速隧道</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0a0a1a;
+      color: #fff;
+      overflow: hidden;
+      touch-action: none;
+      user-select: none;
+    }
+    #game-container {
+      position: fixed; top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      display: flex; justify-content: center; align-items: center;
+    }
+    canvas { display: block; max-width: 100%; max-height: 100%; border-radius: 8px; box-shadow: 0 0 30px rgba(0, 200, 255, 0.2); }
+    
+    #ui-layer {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none; display: flex; flex-direction: column;
+      justify-content: space-between; padding: 20px;
+    }
+    .score-box { display: flex; flex-direction: column; gap: 4px; }
+    .score-display { font-size: 1.6rem; font-weight: bold; text-shadow: 0 0 10px rgba(0,255,200,0.7); }
+    .high-score { font-size: 1rem; opacity: 0.6; }
+    .hint {
+      font-size: 0.9rem; opacity: 0.8; text-align: center; padding: 8px 16px;
+      background: rgba(0,30,60,0.5); border-radius: 20px; align-self: center; margin-bottom: 12px;
+    }
+    
+    .overlay {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(10, 10, 30, 0.92);
+      display: flex; flex-direction: column; justify-content: center; align-items: center;
+      pointer-events: auto; z-index: 10; transition: opacity 0.3s ease;
+    }
+    .overlay.hidden { opacity: 0; pointer-events: none; transform: scale(0.98); }
+    .title { font-size: 2.5rem; font-weight: 800; margin-bottom: 8px; background: linear-gradient(135deg, #00f5ff, #7b00ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-shadow: 0 0 20px rgba(0,245,255,0.4); }
+    .subtitle { font-size: 1.1rem; opacity: 0.85; margin-bottom: 32px; text-align: center; max-width: 80%; line-height: 1.5; }
+    .btn {
+      padding: 14px 44px; font-size: 1.2rem; font-weight: bold; color: #fff;
+      background: linear-gradient(135deg, #00c8ff, #7b00ff); border: none; border-radius: 32px;
+      cursor: pointer; transition: transform 0.1s, box-shadow 0.2s;
+      box-shadow: 0 6px 24px rgba(0,200,255,0.35);
+    }
+    .btn:hover { transform: translateY(-2px); }
+    .btn:active { transform: translateY(1px); }
+    .controls-hint { margin-top: 24px; font-size: 0.9rem; opacity: 0.7; text-align: center; line-height: 1.6; }
+    .controls-hint kbd { display: inline-block; padding: 3px 7px; margin: 0 2px; background: rgba(255,255,255,0.15); border-radius: 4px; font-family: monospace; font-weight: bold; }
+    
+    @media (max-width: 768px) {
+      .title { font-size: 2rem; }
+      .subtitle { font-size: 0.95rem; }
+      .hint { font-size: 0.85rem; padding: 6px 12px; }
+      .controls-hint { font-size: 0.85rem; }
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+    <div id="ui-layer">
+      <div class="score-box">
+        <div class="score-display">距離: <span id="score">0</span>m</div>
+        <div class="high-score">最高紀錄: <span id="high-score">0</span>m</div>
+      </div>
+      <div class="hint" id="hint">← → 或 A/D 移動 | 觸控螢幕左右側</div>
+    </div>
+
+    <div id="start-screen" class="overlay">
+      <h1 class="title">🚀 Tunnel Dash</h1>
+      <p class="subtitle">在高速隧道中躲避障礙，挑戰你的反應極限！</p>
+      <button class="btn" id="start-btn">▶ 開始遊戲</button>
+      <div class="controls-hint">
+        💻 桌面：<kbd>←</kbd> <kbd>→</kbd> 或 <kbd>A</kbd> <kbd>D</kbd><br>
+        📱 移動：點擊螢幕左/右側 或 長按拖曳
+      </div>
+    </div>
+
+    <div id="game-over-screen" class="overlay hidden">
+      <h1 class="title">💥 碰撞！遊戲結束</h1>
+      <p class="subtitle" id="final-stats">最終距離: <span id="final-score">0</span>m</p>
+      <button class="btn" id="restart-btn">🔄 再玩一次</button>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * Tunnel Dash v2.0
+     * 新增：障礙物生成系統、偽3D透視渲染、碰撞檢測、Game Over 流程
+     * 核心原則：requestAnimationFrame、 deltaTime、 鍵盤/觸控統一輸入、響應式 Canvas
+     */
+
+    // ===== 遊戲配置 =====
+    const CONFIG = {
+      canvas: { baseWidth: 800, baseHeight: 600, bg: '#0a0a1a' },
+      player: { radius: 18, speed: 420, color: '#00f5ff', glow: 'rgba(0,245,255,0.5)' },
+      tunnel: {
+        topWidth: 100, bottomWidth: 600, height: 480, segments: 12,
+        flowSpeed: 1.0, // z 單位移動速度
+        colors: { bg1: '#0a0a1a', bg2: '#101030', grid: 'rgba(0,100,200,0.25)', highlight: 'rgba(0,245,255,0.2)' }
+      },
+      obstacle: {
+        minInterval: 28, maxInterval: 50,
+        minGap: 0.30, maxGap: 0.48,
+        thicknessBase: 12, thicknessScale: 8
+      },
+      input: { touchZone: 0.5, lerp: 9 }
+    };
+
+    // ===== 遊戲狀態 =====
+    const state = {
+      running: false,
+      over: false,
+      score: 0,
+      highScore: parseInt(localStorage.getItem('td_highScore') || '0'),
+      lastTime: 0,
+      player: { x: 0, targetX: 0 },
+      obstacles: [],
+      nextSpawnScore: 30,
+      input: { left: false, right: false }
+    };
+
+    // ===== DOM 引用 =====
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d', { alpha: false });
+    const scoreEl = document.getElementById('score');
+    const highScoreEl = document.getElementById('high-score');
+    const finalScoreEl = document.getElementById('final-score');
+    const hintEl = document.getElementById('hint');
+    const startScreen = document.getElementById('start-screen');
+    const gameOverScreen = document.getElementById('game-over-screen');
+    const startBtn = document.getElementById('start-btn');
+    const restartBtn = document.getElementById('restart-btn');
+
+    // ===== Canvas 初始化與響應式 =====
+    function resizeCanvas() {
+      const dpr = window.devicePixelRatio || 1;
+      const box = document.getElementById('game-container');
+      const ratio = CONFIG.canvas.baseWidth / CONFIG.canvas.baseHeight;
+      let w = box.clientWidth, h = w / ratio;
+      if (h > box.clientHeight) { h = box.clientHeight; w = h * ratio; }
+      
+      canvas.style.width = `${w}px`; canvas.style.height = `${h}px`;
+      canvas.width = w * dpr; canvas.height = h * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      CONFIG.tunnel.bottomWidth = w * 0.78;
+      CONFIG.player.baseX = w / 2;
+      CONFIG.player.y = h * 0.78;
+      state.player.x = CONFIG.player.baseX;
+      state.player.targetX = CONFIG.player.baseX;
+    }
+
+    // ===== 輸入系統 =====
+    const Input = {
+      init() {
+        const toggle = (k, v) => {
+          if (k === 'ArrowLeft' || k === 'a' || k === 'A') state.input.left = v;
+          if (k === 'ArrowRight' || k === 'd' || k === 'D') state.input.right = v;
+        };
+        window.addEventListener('keydown', e => { e.preventDefault(); toggle(e.key, true); });
+        window.addEventListener('keyup', e => { toggle(e.key, false); });
+
+        const handleTouch = e => {
+          e.preventDefault();
+          if (!state.running) return;
+          const x = e.touches[0].clientX;
+          const mid = window.innerWidth / 2;
+          state.input.left = x < mid;
+          state.input.right = x >= mid;
+        };
+        const clearTouch = () => { state.input.left = false; state.input.right = false; };
+
+        canvas.addEventListener('touchstart', handleTouch, { passive: false });
+        canvas.addEventListener('touchmove', handleTouch, { passive: false });
+        canvas.addEventListener('touchend', clearTouch, { passive: false });
+        canvas.addEventListener('touchcancel', clearTouch, { passive: false });
+
+        canvas.addEventListener('mousedown', e => {
+          if (!state.running) return;
+          state.input.left = e.clientX < window.innerWidth / 2;
+          state.input.right = !state.input.left;
+        });
+        canvas.addEventListener('mouseup', clearTouch);
+        window.addEventListener('resize', resizeCanvas);
+      },
+      update(dt) {
+        const move = CONFIG.player.speed * dt;
+        if (state.input.left) state.player.targetX -= move;
+        if (state.input.right) state.player.targetX += move;
+
+        const limit = CONFIG.tunnel.bottomWidth / 2 - CONFIG.player.radius - 5;
+        state.player.targetX = Math.max(CONFIG.player.baseX - limit, Math.min(CONFIG.player.baseX + limit, state.player.targetX));
+      }
+    };
+
+    // ===== 障礙物系統 =====
+    function spawnObstacle() {
+      const gapW = CONFIG.obstacle.minGap + Math.random() * (CONFIG.obstacle.maxGap - CONFIG.obstacle.minGap);
+      // 缺口位置 (-1 ~ 1)，避免貼邊
+      const gapX = (Math.random() * 2 - 1) * (1 - gapW * 0.6); 
+      state.obstacles.push({ z: 0, gapX, gapW, checked: false });
+    }
+
+    function updateObstacles(dt) {
+      // 生成邏輯
+      if (state.score >= state.nextSpawnScore) {
+        spawnObstacle();
+        state.nextSpawnScore += CONFIG.obstacle.minInterval + Math.random() * (CONFIG.obstacle.maxInterval - CONFIG.obstacle.minInterval);
+      }
+
+      const speed = CONFIG.tunnel.flowSpeed;
+      const tunnelW = CONFIG.tunnel.bottomWidth;
+      const centerX = CONFIG.player.baseX;
+      const pLeft = state.player.x - CONFIG.player.radius + 4; // +4 緩衝提升手感
+      const pRight = state.player.x + CONFIG.player.radius - 4;
+
+      for (let i = state.obstacles.length - 1; i >= 0; i--) {
+        const obs = state.obstacles[i];
+        obs.z += speed * dt;
+
+        // 碰撞判定 (z接近玩家平面)
+        if (obs.z > 0.88 && !obs.checked) {
+          const gapCenter = centerX + obs.gapX * (tunnelW / 2);
+          const halfGap = (obs.gapW * tunnelW) / 2;
+          if (pRight < gapCenter - halfGap || pLeft > gapCenter + halfGap) {
+            triggerGameOver();
+            return;
+          }
+          obs.checked = true;
+        }
+
+        // 清理超出視野
+        if (obs.z > 1.25) state.obstacles.splice(i, 1);
+      }
+    }
+
+    // ===== 渲染系統 =====
+    function renderTunnel(time) {
+      const { topWidth, bottomWidth, height, segments, colors } = CONFIG.tunnel;
+      const cx = CONFIG.player.baseX;
+      const topY = 60, bottomY = topY + height;
+
+      // 背景漸層
+      const bg = ctx.createLinearGradient(0, topY, 0, bottomY);
+      bg.addColorStop(0, colors.bg2); bg.addColorStop(1, colors.bg1);
+      ctx.fillStyle = bg; ctx.fillRect(0, topY, canvas.width, height);
+
+      // 網格流動
+      const offset = (time * 120) % height;
+      ctx.strokeStyle = colors.grid; ctx.lineWidth = 2;
+      for (let i = 0; i < segments + 1; i++) {
+        let y = topY + (i / segments) * height + offset;
+        if (y > bottomY) y -= height;
+        const t = (y - topY) / height;
+        const w = topWidth + (bottomWidth - topWidth) * t;
+        ctx.beginPath(); ctx.moveTo(cx - w/2, y); ctx.lineTo(cx + w/2, y); ctx.stroke();
+      }
+
+      // 邊框光暈
+      ctx.shadowBlur = 20; ctx.shadowColor = colors.highlight;
+      ctx.strokeStyle = colors.highlight; ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(cx - topWidth/2, topY); ctx.lineTo(cx - bottomWidth/2, bottomY);
+      ctx.moveTo(cx + topWidth/2, topY); ctx.lineTo(cx + bottomWidth/2, bottomY);
+      ctx.stroke(); ctx.shadowBlur = 0;
+    }
+
+    function renderObstacles() {
+      const { topWidth, bottomWidth, height, segments } = CONFIG.tunnel;
+      const cx = CONFIG.player.baseX;
+      const topY = 60;
+      const thickScale = CONFIG.obstacle.thicknessScale;
+
+      state.obstacles.forEach(obs => {
+        if (obs.checked && state.over) return; // 碰撞後不重繪剛碰到的
+        
+        const y = topY + obs.z * height;
+        if (y < topY || y > topY + height + 20) return; // 視口裁切
+        
+        const w = topWidth + (bottomWidth - topWidth) * obs.z;
+        const thickness = CONFIG.obstacle.thicknessBase + obs.z * thickScale;
+        const gapCX = cx + obs.gapX * (w / 2);
+        const gapHalf = (obs.gapW * w) / 2;
+        
+        // 霓虹障礙牆 (左半)
+        ctx.fillStyle = '#ff3366';
+        ctx.fillRect(cx - w/2, y, gapCX - gapHalf - (cx - w/2), thickness);
+        // 右半
+        ctx.fillRect(gapCX + gapHalf, y, (cx + w/2) - (gapCX + gapHalf), thickness);
+        
+        // 邊緣高亮
+        ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1;
+        ctx.strokeRect(cx - w/2, y, w, thickness);
+      });
+    }
+
+    function renderPlayer() {
+      const { x, y, radius, color, glow } = CONFIG.player;
+      ctx.shadowBlur = 18; ctx.shadowColor = glow;
+      ctx.fillStyle = glow;
+      ctx.beginPath(); ctx.arc(x, y, radius + 6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = color;
+      ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0;
+      // 高光
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(x - radius*0.35, y - radius*0.35, radius*0.25, 0, Math.PI*2); ctx.fill();
+    }
+
+    // ===== 遊戲循環 =====
+    function loop(ts) {
+      if (!state.lastTime) state.lastTime = ts;
+      const dt = Math.min((ts - state.lastTime) / 1000, 0.08);
+      state.lastTime = ts;
+
+      if (state.running && !state.over) {
+        state.score += dt * 65; // 基礎計分速率
+        Input.update(dt);
+        state.player.x += (state.player.targetX - state.player.x) * CONFIG.input.lerp * dt;
+        updateObstacles(dt);
+        
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        renderTunnel(ts / 1000);
+        renderObstacles();
+        renderPlayer();
+        scoreEl.textContent = Math.floor(state.score);
+      }
+      
+      requestAnimationFrame(loop);
+    }
+
+    // ===== 狀態控制 =====
+    function startGame() {
+      state.running = true; state.over = false;
+      state.score = 0; state.obstacles = []; state.nextSpawnScore = 30;
+      state.player.x = CONFIG.player.baseX;
+      state.player.targetX = CONFIG.player.baseX;
+      state.input = { left: false, right: false };
+      
+      startScreen.classList.add('hidden');
+      gameOverScreen.classList.add('hidden');
+      hintEl.style.display = 'block';
+      state.lastTime = 0;
+    }
+
+    function triggerGameOver() {
+      state.over = true; state.running = false;
+      if (state.score > state.highScore) {
+        state.highScore = Math.floor(state.score);
+        localStorage.setItem('td_highScore', state.highScore);
+      }
+      finalScoreEl.textContent = Math.floor(state.score);
+      highScoreEl.textContent = state.highScore;
+      gameOverScreen.classList.remove('hidden');
+      hintEl.style.display = 'none';
+    }
+
+    // ===== 初始化 =====
+    function init() {
+      resizeCanvas(); Input.init();
+      highScoreEl.textContent = state.highScore;
+      startBtn.addEventListener('click', startGame);
+      restartBtn.addEventListener('click', startGame);
+      requestAnimationFrame(loop);
+      console.log('🎮 Tunnel Dash v2.0 Ready');
+    }
+    window.addEventListener('load', init);
+  </script>
+</body>
+</html>
